@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Scontrini e Report WhatsApp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Google Identity Services SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-full flex flex-col antialiased">
+
+    <!-- Offline Banner Notification -->
+    <div id="offlineBanner" class="hidden bg-amber-500 text-white px-4 py-2.5 text-xs font-semibold text-center flex items-center justify-center gap-2 shadow-sm transition-all duration-300 z-50">
+        <i class="fa-solid fa-wifi font-bold animate-pulse"></i>
+        <span><strong>Connessione assente:</strong> Modalità offline attiva. Alcune funzionalità di rete potrebbero non essere disponibili.</span>
+    </div>
+
+    <!-- Custom Notification Modal -->
+    <div id="customModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all scale-95 opacity-0 duration-300" id="modalBox">
+            <div id="modalIconContainer" class="w-14 h-14 mx-auto mb-4 rounded-full flex items-center justify-center text-2xl"></div>
+            <h3 id="modalTitle" class="text-lg font-bold text-slate-900 mb-2">Notifica</h3>
+            <p id="modalMessage" class="text-sm text-slate-600 mb-6">Messaggio</p>
+            <div id="modalButtons" class="flex gap-3 justify-center">
+                <button onclick="closeModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2.5 px-4 rounded-xl transition text-xs">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-14 h-14 mx-auto mb-2 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="confirmTitle" class="text-lg font-bold text-slate-900">Conferma Operazione</h3>
+            <p id="confirmMessage" class="text-xs text-slate-600">Sei sicuro di voler procedere?</p>
+            <div class="flex gap-3 pt-2">
+                <button id="confirmCancelBtn" onclick="closeConfirmModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2.5 px-4 rounded-xl transition text-xs">Annulla</button>
+                <button id="confirmOkBtn" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="googleLoginModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-12 h-12 mx-auto bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-2xl">
+                <i class="fa-brands fa-google"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900">Accedi con Google</h3>
+            <p class="text-xs text-slate-500">Memorizza e sincronizza scontrini, cataloghi e impostazioni legati al tuo account Google.</p>
+            
+            <!-- Google Identity Services Button Container -->
+            <div id="g_id_signin_container" class="flex justify-center my-3 min-h-[40px]"></div>
+
+            <div class="border-t border-slate-100 pt-3 text-left">
+                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Oppure seleziona account demo:</p>
+                <div class="space-y-2">
+                    <button onclick="simulateGoogleLogin('mario.rossi@gmail.com', 'Mario Rossi', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100')" class="w-full flex items-center gap-3 p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-left">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" class="w-8 h-8 rounded-full object-cover" alt="User">
+                        <div>
+                            <p class="text-xs font-bold text-slate-900">Mario Rossi</p>
+                            <p class="text-[10px] text-slate-500">mario.rossi@gmail.com</p>
+                        </div>
+                    </button>
+                    <button onclick="simulateGoogleLogin('admin.negozio@gmail.com', 'Negozio Centrale', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100')" class="w-full flex items-center gap-3 p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition text-left">
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100" class="w-8 h-8 rounded-full object-cover" alt="User">
+                        <div>
+                            <p class="text-xs font-bold text-slate-900">Negozio Centrale</p>
+                            <p class="text-[10px] text-slate-500">admin.negozio@gmail.com</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            <button onclick="closeGoogleLoginModal()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2.5 px-4 rounded-xl transition text-xs">Annulla</button>
+        </div>
+    </div>
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div id="appLogoContainer" class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-emerald-500/20 overflow-hidden">
+                    <i class="fa-solid fa-receipt"></i>
+                </div>
+                <div>
+                    <h1 id="headerShopName" class="font-bold text-slate-900 text-base leading-tight">Negozio/Ufficio</h1>
+                    <div class="flex items-center gap-1.5">
+                        <p id="headerOwnerName" class="text-xs text-slate-500">Gestione Scontrini</p>
+                        <span id="googleAuthBadge" class="hidden text-[10px] bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                            <i class="fa-brands fa-google text-[9px]"></i> <span id="badgeEmail"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-1 sm:space-x-2">
+                <button onclick="openGoogleLoginModal()" id="btnHeaderGoogle" class="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 flex items-center space-x-1.5">
+                    <i class="fa-brands fa-google text-sm"></i>
+                    <span id="btnHeaderGoogleText" class="hidden sm:inline">Accedi</span>
+                </button>
+                <button onclick="switchTab('sale')" id="btnTabSale" class="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white shadow-sm transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-cash-register"></i>
+                    <span class="hidden sm:inline">Cassa</span>
+                </button>
+                <button onclick="switchTab('catalog')" id="btnTabCatalog" class="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <span class="hidden sm:inline">Prodotti</span>
+                </button>
+                <button onclick="switchTab('reports')" id="btnTabReports" class="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span class="hidden sm:inline">Report</span>
+                </button>
+                <button onclick="switchTab('settings')" id="btnTabSettings" class="p-2 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 pb-20 overflow-y-auto">
+
+        <!-- TAB SALE / CASSA -->
+        <section id="tabSale" class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-cart-shopping text-emerald-600"></i> Nuovo Scontrino / Vendita
+                </h2>
+
+                <form id="saleForm" onsubmit="handleSaleSubmit(event)" class="space-y-4">
+                    <!-- Catalog Quick Select Pills -->
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Aggiungi rapido da Catalogo</label>
+                        <div id="quickCatalogContainer" class="flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Prodotti / Servizi</label>
+                            <button type="button" onclick="addProductRow()" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i> Aggiungi Riga
+                            </button>
+                        </div>
+                        <div id="productRows" class="space-y-3"></div>
+                    </div>
+
+                    <!-- Payment Method & Summary -->
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
+                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Metodo di Pagamento</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="flex items-center justify-center p-3 border-2 border-emerald-500 bg-emerald-50/50 rounded-xl cursor-pointer transition select-none" id="labelCash">
+                                <input type="radio" name="paymentMethod" value="Contanti" checked onchange="updatePaymentMethodUI()" class="sr-only">
+                                <span class="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                                    <i class="fa-solid fa-money-bill-wave text-emerald-600"></i> Contanti
+                                </span>
+                            </label>
+                            <label class="flex items-center justify-center p-3 border-2 border-slate-200 bg-white rounded-xl cursor-pointer transition select-none" id="labelCard">
+                                <input type="radio" name="paymentMethod" value="Carta" onchange="updatePaymentMethodUI()" class="sr-only">
+                                <span class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                    <i class="fa-solid fa-credit-card text-blue-600"></i> Carta (<span id="currentCardFeeLabel">0</span>%)
+                                </span>
+                            </label>
+                        </div>
+
+                        <!-- Calculated Totals Preview -->
+                        <div class="pt-3 border-t border-slate-200 space-y-1.5 text-sm">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Totale Vendita:</span>
+                                <span id="previewTotalSale" class="font-bold text-slate-900">€0,00</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Totale Acquisto (Costi):</span>
+                                <span id="previewTotalCost" class="font-medium">€0,00</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Guadagno Lordo:</span>
+                                <span id="previewGrossProfit" class="font-medium text-emerald-600">€0,00</span>
+                            </div>
+                            <div id="feeRowPreview" class="flex justify-between text-rose-600 hidden">
+                                <span>Trattenuta Carta (<span id="feePercentDisplay">0</span>%):</span>
+                                <span id="previewFeeAmount" class="font-medium">-€0,00</span>
+                            </div>
+                            <div class="flex justify-between text-base font-bold pt-2 border-t border-slate-200 text-slate-900">
+                                <span>Guadagno Netto Effettivo:</span>
+                                <span id="previewNetProfit" class="text-emerald-600">€0,00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-xl"></i> Emetti Scontrino e Invia PDF su WhatsApp
+                    </button>
+                </form>
+            </div>
+
+            <!-- WhatsApp Share Card -->
+            <div id="whatsappPreviewCard" class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-emerald-900 flex items-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-emerald-600 text-xl"></i> Scontrino 90mm Pronto per WhatsApp
+                    </h3>
+                    <span class="text-xs bg-emerald-200 text-emerald-800 font-semibold px-2.5 py-1 rounded-full">Pronto</span>
+                </div>
+                
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button onclick="openThermalReceiptModal()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs">
+                        <i class="fa-solid fa-receipt text-emerald-400"></i> Visualizza Scontrino 90mm (Stampa / PDF)
+                    </button>
+                    <button onclick="emitReceiptOnly()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs">
+                        <i class="fa-solid fa-circle-check text-white"></i> Emetti Scontrino
+                    </button>
+                    <button onclick="sendPDFToWhatsApp()" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs">
+                        <i class="fa-brands fa-whatsapp text-lg"></i> Invia PDF su WhatsApp
+                    </button>
+                </div>
+                <div class="bg-white p-3 rounded-xl border border-emerald-200 text-xs font-mono whitespace-pre-line text-slate-700 max-h-40 overflow-y-auto" id="whatsappTextOutput"></div>
+                <div class="flex justify-between items-center text-xs text-slate-600">
+                    <span>Cliccando su Invia PDF si scaricherà il PDF da allegare nella chat WhatsApp.</span>
+                    <button onclick="copyReceiptText()" class="font-medium flex items-center gap-1 hover:text-slate-900">
+                        <i class="fa-solid fa-copy"></i> Copia Testo
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="tabCatalog" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-boxes-stacked text-emerald-600"></i> Catalogo Prodotti e Servizi
+                        </h2>
+                        <p class="text-xs text-slate-500">Crea e gestisci il tuo listino di riferimento.</p>
+                    </div>
+                    <button onclick="openCatalogModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Nuovo Prodotto
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-3">Nome Prodotto / Servizio</th>
+                                <th class="py-3 px-3 text-right">Prezzo Acquisto</th>
+                                <th class="py-3 px-3 text-right">Prezzo Cliente</th>
+                                <th class="py-3 px-3 text-right">Guadagno Previsto</th>
+                                <th class="py-3 px-3 text-center">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="catalogTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tabReports" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-bar text-emerald-600"></i> Report Vendite
+                        </h2>
+                        <p class="text-xs text-slate-500">Visualizza, modifica o esporta i tuoi scontrini.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <select id="reportFilterType" onchange="toggleReportFilter()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-emerald-500">
+                            <option value="daily">Filtra per Giorno</option>
+                            <option value="monthly">Filtra per Mese</option>
+                            <option value="all">Tutti i Report</option>
+                        </select>
+                        <input type="date" id="reportDateInput" onchange="renderReports()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-emerald-500">
+                        <input type="month" id="reportMonthInput" onchange="renderReports()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-emerald-500 hidden">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                        <p class="text-[11px] font-semibold text-slate-500 uppercase">Totale Vendite</p>
+                        <p id="repTotalSales" class="text-base font-bold text-slate-900 mt-1">€0,00</p>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                        <p class="text-[11px] font-semibold text-slate-500 uppercase">Costi Acquisto</p>
+                        <p id="repTotalCosts" class="text-base font-bold text-slate-700 mt-1">€0,00</p>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                        <p class="text-[11px] font-semibold text-slate-500 uppercase">Trattenute Carta</p>
+                        <p id="repTotalFees" class="text-base font-bold text-rose-600 mt-1">€0,00</p>
+                    </div>
+                    <div class="bg-emerald-50 p-3.5 rounded-xl border border-emerald-100">
+                        <p class="text-[11px] font-semibold text-emerald-700 uppercase">Guadagno Netto</p>
+                        <p id="repTotalNet" class="text-base font-bold text-emerald-700 mt-1">€0,00</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button onclick="exportReportPDF()" class="bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs py-2.5 px-4 rounded-xl transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-file-pdf text-rose-400 text-sm"></i> Esporta Report in PDF
+                    </button>
+                    <button onclick="openReportViewModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs py-2.5 px-4 rounded-xl transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-eye text-white text-sm"></i> Visualizza Report
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-3">Data / Ora</th>
+                                <th class="py-3 px-3">Prodotti / Metodo</th>
+                                <th class="py-3 px-3 text-right">Totale</th>
+                                <th class="py-3 px-3 text-right">Netto</th>
+                                <th class="py-3 px-3 text-center">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tabSettings" class="space-y-6 hidden">
+            <!-- Google Account Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-brands fa-google text-blue-600"></i> Account Google e Sincronizzazione Dati
+                </h2>
+                <p class="text-xs text-slate-500">Connettiti con Google per salvare i tuoi scontrini, cataloghi e report direttamente legati al tuo account personale nel browser.</p>
+
+                <div id="googleAuthSection" class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div id="googleUserInfo" class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-bold text-lg" id="googleUserAvatar">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <p id="googleUserName" class="text-sm font-bold text-slate-900">Modalità Ospite (Locale)</p>
+                            <p id="googleUserEmail" class="text-xs text-slate-500">Accedi per salvare i dati sul tuo account.</p>
+                        </div>
+                    </div>
+                    <div id="googleAuthButtons">
+                        <button onclick="openGoogleLoginModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md transition flex items-center gap-2">
+                            <i class="fa-brands fa-google"></i> Accedi con Google
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shop Settings Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-gear text-emerald-600"></i> Impostazioni Negozio e App
+                </h2>
+
+                <form id="settingsForm" onsubmit="saveSettings(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Nome Negozio / Ufficio</label>
+                        <input type="text" id="setShopName" required placeholder="Es. Caffè Centrale" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white transition">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Nome Proprietario</label>
+                            <input type="text" id="setOwnerName" placeholder="Es. Mario Rossi" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Partita IVA</label>
+                            <input type="text" id="setVatNumber" placeholder="Es. 01234567890" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Indirizzo / Via</label>
+                        <input type="text" id="setAddress" placeholder="Es. Via Roma 15, Milano" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white transition">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Trattenuta Carta (%)</label>
+                            <div class="relative">
+                                <input type="number" step="0.01" min="0" max="100" id="setCardFee" required placeholder="Es. 1.5" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:bg-white transition pr-10">
+                                <span class="absolute right-4 top-3 text-slate-400 font-bold">%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Icona / Immagine App</label>
+                            <input type="file" id="setIconFile" accept="image/*" onchange="handleImageUpload(event)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-4 pt-2">
+                        <div id="settingsLogoPreview" class="w-16 h-16 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-2xl shadow-md overflow-hidden">
+                            <i class="fa-solid fa-receipt"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-slate-700">Anteprima Icona Applicazione</p>
+                            <p class="text-[11px] text-slate-500">Verrà mostrata nell'intestazione e salvata.</p>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-200 space-y-3">
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i> Salva Impostazioni
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="pdfExportContainer" class="hidden bg-white p-8 text-slate-800 max-w-2xl mx-auto font-sans">
+        <div class="border-b border-slate-300 pb-4 mb-6 flex justify-between items-start">
+            <div>
+                <h1 id="pdfShopName" class="text-2xl font-bold text-slate-900">Negozio</h1>
+                <p id="pdfOwnerInfo" class="text-xs text-slate-600">Proprietario | P.IVA | Indirizzo</p>
+            </div>
+            <div class="text-right">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-600">Report Vendite</h2>
+                <p id="pdfReportPeriod" class="text-xs text-slate-500">Periodo: Odierno</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-4 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+            <div>
+                <p class="text-slate-500 font-semibold uppercase">Totale Vendite</p>
+                <p id="pdfTotalSales" class="text-sm font-bold text-slate-900 mt-1">€0,00</p>
+            </div>
+            <div>
+                <p class="text-slate-500 font-semibold uppercase">Costi Acquisto</p>
+                <p id="pdfTotalCosts" class="text-sm font-bold text-slate-700 mt-1">€0,00</p>
+            </div>
+            <div>
+                <p class="text-slate-500 font-semibold uppercase">Trattenute Carta</p>
+                <p id="pdfTotalFees" class="text-sm font-bold text-rose-600 mt-1">€0,00</p>
+            </div>
+            <div>
+                <p class="text-slate-500 font-semibold uppercase">Guadagno Netto</p>
+                <p id="pdfTotalNet" class="text-sm font-bold text-emerald-700 mt-1">€0,00</p>
+            </div>
+        </div>
+
+        <table class="w-full text-left border-collapse mb-6 text-xs">
+            <thead>
+                <tr class="border-b border-slate-300 font-bold text-slate-600 uppercase">
+                    <th class="py-2 px-2">Data/Ora</th>
+                    <th class="py-2 px-2">Dettagli</th>
+                    <th class="py-2 px-2 text-right">Totale</th>
+                    <th class="py-2 px-2 text-right">Netto</th>
+                </tr>
+            </thead>
+            <tbody id="pdfTableBody" class="divide-y divide-slate-200"></tbody>
+        </table>
+
+        <div class="text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4">
+            Generato automaticamente tramite App Scontrini & Report WhatsApp
+        </div>
+    </div>
+
+    <!-- Edit Entry Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h3 class="text-lg font-bold text-slate-900">Modifica Voce Scontrino</h3>
+            <input type="hidden" id="editEntryId">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Totale Scontrino (€)</label>
+                <input type="number" step="0.01" id="editTotalAmount" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Guadagno Netto (€)</label>
+                <input type="number" step="0.01" id="editNetProfitAmount" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeEditModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2.5 px-4 rounded-xl transition text-xs">Annulla</button>
+                <button onclick="saveEditedEntry()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs">Salva</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catalog Modal -->
+    <div id="catalogModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h3 id="catalogModalTitle" class="text-lg font-bold text-slate-900">Aggiungi Prodotto</h3>
+            <input type="hidden" id="catalogEditId">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Nome Prodotto / Servizio</label>
+                <input type="text" id="catItemName" placeholder="Es. Caffè Espresso" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Prezzo di Acquisto / Costo (€)</label>
+                <input type="number" step="0.01" min="0" id="catItemCost" placeholder="0.50" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Prezzo al Cliente (€)</label>
+                <input type="number" step="0.01" min="0" id="catItemPrice" placeholder="1.20" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500" required>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeCatalogModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2.5 px-4 rounded-xl transition text-xs">Annulla</button>
+                <button type="button" onclick="saveCatalogItem()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs">Salva</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report View Modal (Read-only) -->
+    <div id="reportViewModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-5 my-auto max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                    <i class="fa-solid fa-eye text-emerald-600"></i> Visualizzazione Report Dettagliato
+                </h3>
+                <button onclick="closeReportViewModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 flex-1 overflow-y-auto pr-1">
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+                    <div class="flex justify-between font-semibold text-slate-700">
+                        <span id="modalReportPeriodLabel">Periodo: Odierno</span>
+                        <span id="modalReportCount" class="text-emerald-600 font-bold">0 Scontrini</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200">
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Totale Vendite</p>
+                            <p id="modalRepSales" class="font-bold text-slate-900">€0,00</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Costi</p>
+                            <p id="modalRepCosts" class="font-bold text-slate-700">€0,00</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Trattenute</p>
+                            <p id="modalRepFees" class="font-bold text-rose-600">€0,00</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-slate-500 uppercase">Netto</p>
+                            <p id="modalRepNet" class="font-bold text-emerald-600">€0,00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Elenco Scontrini Inclusi</h4>
+                    <div id="modalReportEntriesList" class="space-y-2 max-h-60 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50/50"></div>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3 pt-3 border-t border-slate-100">
+                <button onclick="closeReportViewModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2.5 px-4 rounded-xl transition text-xs">
+                    Chiudi
+                </button>
+                <button onclick="exportReportPDFFromModal()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-rose-400"></i> Esporta Report PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thermal Receipt Modal (90mm) -->
+    <div id="thermalReceiptModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 my-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-receipt text-emerald-600"></i> Scontrino 90mm (Termico)
+                </h3>
+                <button onclick="closeThermalReceiptModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Printable 90mm Receipt Wrapper -->
+            <div id="thermalReceiptBox" class="bg-white p-5 font-mono text-xs text-slate-900 border border-dashed border-slate-300 rounded-xl space-y-2.5 shadow-inner max-w-[90mm] mx-auto w-full">
+                <div class="text-center space-y-1 border-b border-dashed border-slate-300 pb-3">
+                    <div id="thermalShopName" class="font-bold text-base uppercase">Negozio</div>
+                    <div id="thermalOwnerInfo" class="text-xs text-slate-600">Proprietario | P.IVA</div>
+                    <div id="thermalAddress" class="text-xs text-slate-600">Indirizzo</div>
+                </div>
+
+                <div class="space-y-1 text-xs text-slate-600 border-b border-dashed border-slate-300 pb-2.5">
+                    <div class="flex justify-between">
+                        <span>DATA: <span id="thermalDate">--/--/---- --:--</span></span>
+                        <span>SCONTRINO #<span id="thermalReceiptId">---</span></span>
+                    </div>
+                </div>
+
+                <div class="border-b border-dashed border-slate-300 pb-2.5">
+                    <div class="grid grid-cols-12 font-bold border-b border-slate-200 pb-1 mb-1.5 text-xs">
+                        <div class="col-span-6">DESCRIZIONE</div>
+                        <div class="col-span-2 text-center">QT</div>
+                        <div class="col-span-4 text-right">TOT</div>
+                    </div>
+                    <div id="thermalItemsList" class="space-y-1.5"></div>
+                </div>
+
+                <div class="space-y-1.5 text-sm pt-1 border-b border-dashed border-slate-300 pb-3">
+                    <div class="flex justify-between font-bold text-base">
+                        <span>TOTALE:</span>
+                        <span id="thermalTotal">€0,00</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-600">
+                        <span>METODO PAGAMENTO:</span>
+                        <span id="thermalPaymentMethod">Contanti</span>
+                    </div>
+                    <div id="thermalFeeRow" class="flex justify-between text-xs text-rose-600 hidden">
+                        <span>Trattenuta Carta:</span>
+                        <span id="thermalFeeAmount">-€0,00</span>
+                    </div>
+                </div>
+
+                <div class="text-center text-xs text-slate-500 pt-1 space-y-1">
+                    <p>Documento non fiscale per uso interno</p>
+                    <p class="font-bold">Grazie per la visita! 🙏</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2 pt-2">
+                <button onclick="emitReceiptOnly()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-md">
+                    <i class="fa-solid fa-circle-check"></i> Emetti Scontrino
+                </button>
+                <button onclick="sendPDFToWhatsApp()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-whatsapp"></i> Invia PDF su WhatsApp
+                </button>
+                <button onclick="printThermalReceipt()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-print"></i> Stampa Scontrino 90mm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null; // Google user profile
+
+        let settings = {
+            shopName: 'Negozio / Ufficio',
+            ownerName: 'Proprietario',
+            vatNumber: 'IT01234567890',
+            address: 'Via Principale 1',
+            cardFee: 1.5,
+            iconDataUrl: ''
+        };
+
+        let entries = [];
+        let catalog = [];
+        let reportNotesMap = {};
+        let currentWhatsAppText = '';
+        let lastCreatedEntry = null;
+        let confirmCallback = null;
+
+        window.onload = function() {
+            checkNetworkStatus();
+            window.addEventListener('online', updateNetworkStatus);
+            window.addEventListener('offline', updateNetworkStatus);
+
+            // Initialize Google Identity Services
+            if (typeof google !== 'undefined' && google.accounts) {
+                try {
+                    google.accounts.id.initialize({
+                        client_id: '994279649077-6qnoq31ej3pkr4k86a4gekl28e94p8tm.apps.googleusercontent.com',
+                        callback: handleGoogleCredentialResponse,
+                        auto_select: false
+                    });
+                    google.accounts.id.renderButton(
+                        document.getElementById('g_id_signin_container'),
+                        { theme: 'outline', size: 'large', width: '100%', text: 'signin_with', locale: 'it' }
+                    );
+                } catch (e) {
+                    console.warn('Google Identity Services initialization warning:', e);
+                }
+            }
+
+            loadGoogleUser();
+            loadSettings();
+            loadEntries();
+            loadCatalog();
+            setupDateInputs();
+            renderReports();
+            renderCatalog();
+            renderQuickCatalog();
+        };
+
+        function parseJwt(token) {
+            try {
+                var base64Url = token.split('.')[1];
+                var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function handleGoogleCredentialResponse(response) {
+            if (response.credential) {
+                const payload = parseJwt(response.credential);
+                if (payload) {
+                    const googleUser = {
+                        email: payload.email,
+                        name: payload.name || payload.email.split('@')[0],
+                        picture: payload.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
+                    };
+                    currentUser = googleUser;
+                    localStorage.setItem('app_google_user_v4', JSON.stringify(currentUser));
+                    closeGoogleLoginModal();
+                    updateGoogleUserUI();
+
+                    loadSettings();
+                    loadEntries();
+                    loadCatalog();
+                    renderReports();
+                    renderCatalog();
+                    renderQuickCatalog();
+
+                    showNotification('Accesso Effettuato', 'Benvenuto ' + currentUser.name + ' tramite Google!');
+                }
+            }
+        }
+
+        function checkNetworkStatus() {
+            updateNetworkStatus();
+        }
+
+        function updateNetworkStatus() {
+            const banner = document.getElementById('offlineBanner');
+            if (!navigator.onLine) {
+                if (banner) banner.classList.remove('hidden');
+            } else {
+                if (banner) banner.classList.add('hidden');
+            }
+        }
+
+        function getStorageKeys() {
+            const suffix = currentUser ? '_' + currentUser.email : '_guest';
+            return {
+                settings: 'app_receipts_settings_v4' + suffix,
+                entries: 'app_receipts_entries_v4' + suffix,
+                catalog: 'app_receipts_catalog_v4' + suffix
+            };
+        }
+
+        function loadGoogleUser() {
+            const savedUser = localStorage.getItem('app_google_user_v4');
+            if (savedUser) {
+                try {
+                    currentUser = JSON.parse(savedUser);
+                } catch(e) {}
+            }
+            updateGoogleUserUI();
+        }
+
+        function updateGoogleUserUI() {
+            const badge = document.getElementById('googleAuthBadge');
+            const badgeEmail = document.getElementById('badgeEmail');
+            const userNameEl = document.getElementById('googleUserName');
+            const userEmailEl = document.getElementById('googleUserEmail');
+            const userAvatarEl = document.getElementById('googleUserAvatar');
+            const authButtons = document.getElementById('googleAuthButtons');
+            const btnHeaderGoogleText = document.getElementById('btnHeaderGoogleText');
+            const btnHeaderGoogle = document.getElementById('btnHeaderGoogle');
+
+            if (currentUser) {
+                badge.classList.remove('hidden');
+                badgeEmail.textContent = currentUser.email;
+                userNameEl.textContent = currentUser.name;
+                userEmailEl.textContent = currentUser.email + ' (Connesso con Google)';
+                userAvatarEl.innerHTML = '<img src="' + currentUser.picture + '" class="w-full h-full object-cover rounded-full" alt="Avatar">';
+                authButtons.innerHTML = '<button onclick="logoutGoogleUser()" class="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs py-2.5 px-4 rounded-xl border border-rose-200 transition flex items-center gap-2"><i class="fa-solid fa-right-from-bracket"></i> Disconnetti</button>';
+                
+                if (btnHeaderGoogleText) btnHeaderGoogleText.textContent = currentUser.name.split(' ')[0];
+                if (btnHeaderGoogle) {
+                    btnHeaderGoogle.className = 'px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 transition hover:bg-blue-100 flex items-center space-x-1.5';
+                    btnHeaderGoogle.onclick = () => switchTab('settings');
+                }
+            } else {
+                badge.classList.add('hidden');
+                userNameEl.textContent = 'Modalità Ospite (Locale)';
+                userEmailEl.textContent = 'Accedi per salvare i dati sincronizzati sul tuo account Google.';
+                userAvatarEl.innerHTML = '<i class="fa-solid fa-user"></i>';
+                authButtons.innerHTML = '<button onclick="openGoogleLoginModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md transition flex items-center gap-2"><i class="fa-brands fa-google"></i> Accedi con Google</button>';
+                
+                if (btnHeaderGoogleText) btnHeaderGoogleText.textContent = 'Accedi';
+                if (btnHeaderGoogle) {
+                    btnHeaderGoogle.className = 'px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 flex items-center space-x-1.5';
+                    btnHeaderGoogle.onclick = openGoogleLoginModal;
+                }
+            }
+        }
+
+        function openGoogleLoginModal() {
+            document.getElementById('googleLoginModal').classList.remove('hidden');
+        }
+
+        function closeGoogleLoginModal() {
+            document.getElementById('googleLoginModal').classList.add('hidden');
+        }
+
+        function simulateGoogleLogin(email, name, picture) {
+            currentUser = { email, name, picture };
+            localStorage.setItem('app_google_user_v4', JSON.stringify(currentUser));
+            closeGoogleLoginModal();
+            updateGoogleUserUI();
+
+            loadSettings();
+            loadEntries();
+            loadCatalog();
+            renderReports();
+            renderCatalog();
+            renderQuickCatalog();
+
+            showNotification('Accesso Effettuato', 'Benvenuto ' + name + '! Dati caricati per ' + email);
+        }
+
+        function logoutGoogleUser() {
+            currentUser = null;
+            localStorage.removeItem('app_google_user_v4');
+            updateGoogleUserUI();
+
+            loadSettings();
+            loadEntries();
+            loadCatalog();
+            renderReports();
+            renderCatalog();
+            renderQuickCatalog();
+
+            showNotification('Disconnessione', 'Account Google disconnesso. Ora in modalità ospite.');
+        }
+
+        function showNotification(title, message, type = 'success') {
+            const modal = document.getElementById('customModal');
+            const box = document.getElementById('modalBox');
+            const iconContainer = document.getElementById('modalIconContainer');
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+
+            iconContainer.className = 'w-14 h-14 mx-auto mb-4 rounded-full flex items-center justify-center text-2xl ' + 
+                (type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600');
+            iconContainer.innerHTML = type === 'success' ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-triangle-exclamation"></i>';
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                box.classList.remove('scale-95', 'opacity-0');
+                box.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('customModal');
+            const box = document.getElementById('modalBox');
+            box.classList.remove('scale-100', 'opacity-100');
+            box.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        function showConfirmModal(message, onConfirm, title = 'Conferma Operazione') {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            confirmCallback = onConfirm;
+            document.getElementById('confirmModal').classList.remove('hidden');
+            const okBtn = document.getElementById('confirmOkBtn');
+            okBtn.onclick = function() {
+                closeConfirmModal();
+                if (confirmCallback) confirmCallback();
+            };
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            confirmCallback = null;
+        }
+
+        function switchTab(tabName) {
+            ['Sale', 'Catalog', 'Reports', 'Settings'].forEach(t => {
+                const el = document.getElementById('tab' + t);
+                const btn = document.getElementById('btnTab' + t);
+                if (el) el.classList.add('hidden');
+                if (btn) {
+                    btn.className = 'px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center space-x-1.5';
+                }
+            });
+
+            document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
+            const activeBtn = document.getElementById('btnTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            if (activeBtn) {
+                activeBtn.className = 'px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white shadow-sm transition flex items-center space-x-1.5';
+            }
+        }
+
+        function loadSettings() {
+            const keys = getStorageKeys();
+            const saved = localStorage.getItem(keys.settings);
+            if (saved) {
+                try { settings = JSON.parse(saved); } catch(e) {}
+            } else {
+                settings = {
+                    shopName: currentUser ? currentUser.name + ' Store' : 'Negozio / Ufficio',
+                    ownerName: currentUser ? currentUser.name : 'Proprietario',
+                    vatNumber: 'IT01234567890',
+                    address: 'Via Principale 1',
+                    cardFee: 1.5,
+                    iconDataUrl: currentUser ? currentUser.picture : ''
+                };
+            }
+            document.getElementById('headerShopName').textContent = settings.shopName;
+            document.getElementById('headerOwnerName').textContent = settings.ownerName || 'Gestione Scontrini';
+            document.getElementById('currentCardFeeLabel').textContent = settings.cardFee;
+            document.getElementById('feePercentDisplay').textContent = settings.cardFee;
+
+            document.getElementById('setShopName').value = settings.shopName;
+            document.getElementById('setOwnerName').value = settings.ownerName;
+            document.getElementById('setVatNumber').value = settings.vatNumber;
+            document.getElementById('setAddress').value = settings.address;
+            document.getElementById('setCardFee').value = settings.cardFee;
+
+            updateAppLogoUI();
+        }
+
+        function saveSettings(e) {
+            e.preventDefault();
+            settings.shopName = document.getElementById('setShopName').value.trim();
+            settings.ownerName = document.getElementById('setOwnerName').value.trim();
+            settings.vatNumber = document.getElementById('setVatNumber').value.trim();
+            settings.address = document.getElementById('setAddress').value.trim();
+            settings.cardFee = parseFloat(document.getElementById('setCardFee').value) || 0;
+
+            const keys = getStorageKeys();
+            localStorage.setItem(keys.settings, JSON.stringify(settings));
+            loadSettings();
+            calculateSaleTotals();
+            showNotification('Successo', 'Impostazioni salvate e sincronizzate con successo!');
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                settings.iconDataUrl = evt.target.result;
+                updateAppLogoUI();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateAppLogoUI() {
+            const containers = [document.getElementById('appLogoContainer'), document.getElementById('settingsLogoPreview')];
+            containers.forEach(container => {
+                if (!container) return;
+                if (settings.iconDataUrl) {
+                    container.innerHTML = '<img src="' + settings.iconDataUrl + '" class="w-full h-full object-cover" alt="Logo">';
+                } else {
+                    container.innerHTML = '<i class="fa-solid fa-receipt"></i>';
+                }
+            });
+        }
+
+        function loadCatalog() {
+            const keys = getStorageKeys();
+            const saved = localStorage.getItem(keys.catalog);
+            if (saved) {
+                try { catalog = JSON.parse(saved); } catch(e) {}
+            } else {
+                catalog = [
+                    { id: '1', name: 'Caffè Espresso', cost: 0.35, price: 1.20 },
+                    { id: '2', name: 'Cappuccino', cost: 0.60, price: 1.80 },
+                    { id: '3', name: 'Cornetto', cost: 0.40, price: 1.30 }
+                ];
+                saveCatalogStorage();
+            }
+        }
+
+        function saveCatalogStorage() {
+            const keys = getStorageKeys();
+            localStorage.setItem(keys.catalog, JSON.stringify(catalog));
+        }
+
+        function renderCatalog() {
+            const tbody = document.getElementById('catalogTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (catalog.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-400 text-xs">Nessun prodotto in catalogo. Aggiungine uno!</td></tr>';
+                return;
+            }
+            catalog.forEach(item => {
+                const profit = (item.price - (item.cost || 0)).toFixed(2);
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-3 px-3 font-medium text-slate-800">${item.name}</td>
+                        <td class="py-3 px-3 text-right text-slate-600">€${(item.cost || 0).toFixed(2)}</td>
+                        <td class="py-3 px-3 text-right font-semibold text-emerald-600">€${item.price.toFixed(2)}</td>
+                        <td class="py-3 px-3 text-right text-slate-600">€${profit}</td>
+                        <td class="py-3 px-3 text-center space-x-2">
+                            <button onclick="editCatalogItem('${item.id}')" class="text-slate-400 hover:text-emerald-600 transition"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteCatalogItem('${item.id}')" class="text-slate-400 hover:text-rose-600 transition"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            renderQuickCatalog();
+        }
+
+        function renderQuickCatalog() {
+            const container = document.getElementById('quickCatalogContainer');
+            if (!container) return;
+            container.innerHTML = '';
+            if (catalog.length === 0) {
+                container.innerHTML = '<span class="text-xs text-slate-400 italic">Nessun prodotto rapido. Aggiungine dal tab Prodotti.</span>';
+                return;
+            }
+            catalog.forEach(item => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 text-xs font-medium py-1.5 px-3 rounded-lg shadow-sm transition flex items-center gap-1.5';
+                btn.innerHTML = `<i class="fa-solid fa-plus text-emerald-600 text-[10px]"></i> ${item.name} (€${item.price.toFixed(2)})`;
+                btn.onclick = () => addProductRow(item.name, item.cost || 0, item.price, 1);
+                container.appendChild(btn);
+            });
+        }
+
+        function openCatalogModal(id = null) {
+            document.getElementById('catalogEditId').value = id || '';
+            document.getElementById('catItemName').value = '';
+            document.getElementById('catItemCost').value = '';
+            document.getElementById('catItemPrice').value = '';
+            document.getElementById('catalogModalTitle').textContent = id ? 'Modifica Prodotto' : 'Aggiungi Prodotto';
+
+            if (id) {
+                const item = catalog.find(c => c.id === id);
+                if (item) {
+                    document.getElementById('catItemName').value = item.name;
+                    document.getElementById('catItemCost').value = item.cost || 0;
+                    document.getElementById('catItemPrice').value = item.price;
+                }
+            }
+            document.getElementById('catalogModal').classList.remove('hidden');
+        }
+
+        function closeCatalogModal() {
+            document.getElementById('catalogModal').classList.add('hidden');
+        }
+
+        function editCatalogItem(id) {
+            openCatalogModal(id);
+        }
+
+        function saveCatalogItem() {
+            const id = document.getElementById('catalogEditId').value;
+            const name = document.getElementById('catItemName').value.trim() || 'Prodotto Senza Nome';
+            const cost = parseFloat(document.getElementById('catItemCost').value) || 0;
+            const price = parseFloat(document.getElementById('catItemPrice').value);
+
+            if (isNaN(price)) {
+                showNotification('Attenzione', 'Inserisci un prezzo di vendita valido.', 'error');
+                return;
+            }
+
+            if (id) {
+                const item = catalog.find(c => c.id === id);
+                if (item) {
+                    item.name = name;
+                    item.cost = cost;
+                    item.price = price;
+                }
+            } else {
+                catalog.push({
+                    id: Date.now().toString(),
+                    name,
+                    cost,
+                    price
+                });
+            }
+
+            saveCatalogStorage();
+            renderCatalog();
+            closeCatalogModal();
+            showNotification('Successo', 'Catalogo aggiornato con successo!');
+        }
+
+        function deleteCatalogItem(id) {
+            showConfirmModal('Vuoi davvero eliminare questo prodotto dal catalogo?', () => {
+                catalog = catalog.filter(c => c.id !== id);
+                saveCatalogStorage();
+                renderCatalog();
+                showNotification('Eliminato', 'Prodotto rimosso dal catalogo.');
+            });
+        }
+
+        function addProductRow(name = '', cost = 0, price = 0, qty = 1) {
+            const rowsContainer = document.getElementById('productRows');
+            const rowId = 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200';
+            div.id = rowId;
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input type="text" placeholder="Nome prodotto / Servizio (opzionale)" value="${name}" class="row-name w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" oninput="calculateSaleTotals()">
+                </div>
+                <div class="w-20">
+                    <input type="number" step="0.01" min="0" placeholder="Costo" value="${cost || ''}" class="row-cost w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-emerald-500 text-right" title="Costo unitario acquisto" oninput="calculateSaleTotals()">
+                </div>
+                <div class="w-20">
+                    <input type="number" step="0.01" min="0" placeholder="Prezzo" value="${price || ''}" class="row-price w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-emerald-500 text-right font-semibold text-emerald-700" required oninput="calculateSaleTotals()">
+                </div>
+                <div class="w-16">
+                    <input type="number" min="1" value="${qty}" class="row-qty w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-emerald-500 text-center" oninput="calculateSaleTotals()">
+                </div>
+                <button type="button" onclick="removeProductRow('${rowId}')" class="text-slate-400 hover:text-rose-600 p-1.5 transition"><i class="fa-solid fa-trash text-xs"></i></button>
+            `;
+            rowsContainer.appendChild(div);
+            calculateSaleTotals();
+        }
+
+        function removeProductRow(rowId) {
+            const el = document.getElementById(rowId);
+            if (el) el.remove();
+            calculateSaleTotals();
+        }
+
+        function updatePaymentMethodUI() {
+            const isCash = document.querySelector('input[name="paymentMethod"]:checked').value === 'Contanti';
+            const labelCash = document.getElementById('labelCash');
+            const labelCard = document.getElementById('labelCard');
+
+            if (isCash) {
+                labelCash.className = 'flex items-center justify-center p-3 border-2 border-emerald-500 bg-emerald-50/50 rounded-xl cursor-pointer transition select-none';
+                labelCash.querySelector('span').className = 'flex items-center gap-2 text-sm font-semibold text-emerald-800';
+                labelCard.className = 'flex items-center justify-center p-3 border-2 border-slate-200 bg-white rounded-xl cursor-pointer transition select-none';
+                labelCard.querySelector('span').className = 'flex items-center gap-2 text-sm font-semibold text-slate-700';
+            } else {
+                labelCard.className = 'flex items-center justify-center p-3 border-2 border-emerald-500 bg-emerald-50/50 rounded-xl cursor-pointer transition select-none';
+                labelCard.querySelector('span').className = 'flex items-center gap-2 text-sm font-semibold text-emerald-800';
+                labelCash.className = 'flex items-center justify-center p-3 border-2 border-slate-200 bg-white rounded-xl cursor-pointer transition select-none';
+                labelCash.querySelector('span').className = 'flex items-center gap-2 text-sm font-semibold text-slate-700';
+            }
+            calculateSaleTotals();
+        }
+
+        function calculateSaleTotals() {
+            const rows = document.querySelectorAll('#productRows > div');
+            let totalSale = 0;
+            let totalCost = 0;
+
+            rows.forEach(row => {
+                const price = parseFloat(row.querySelector('.row-price').value) || 0;
+                const cost = parseFloat(row.querySelector('.row-cost').value) || 0;
+                const qty = parseInt(row.querySelector('.row-qty').value) || 1;
+
+                totalSale += price * qty;
+                totalCost += cost * qty;
+            });
+
+            const grossProfit = totalSale - totalCost;
+            const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+            let feeAmount = 0;
+
+            const feeRowPreview = document.getElementById('feeRowPreview');
+            if (paymentMethod === 'Carta' && settings.cardFee > 0) {
+                feeAmount = (totalSale * settings.cardFee) / 100;
+                feeRowPreview.classList.remove('hidden');
+                document.getElementById('previewFeeAmount').textContent = '-€' + feeAmount.toFixed(2);
+            } else {
+                feeRowPreview.classList.add('hidden');
+            }
+
+            const netProfit = grossProfit - feeAmount;
+
+            document.getElementById('previewTotalSale').textContent = '€' + totalSale.toFixed(2);
+            document.getElementById('previewTotalCost').textContent = '€' + totalCost.toFixed(2);
+            document.getElementById('previewGrossProfit').textContent = '€' + grossProfit.toFixed(2);
+            document.getElementById('previewNetProfit').textContent = '€' + netProfit.toFixed(2);
+        }
+
+        function handleSaleSubmit(e) {
+            e.preventDefault();
+            const rows = document.querySelectorAll('#productRows > div');
+            if (rows.length === 0) {
+                showNotification('Attenzione', 'Aggiungi almeno una riga di importo.', 'error');
+                return;
+            }
+
+            let items = [];
+            let totalSale = 0;
+            let totalCost = 0;
+
+            rows.forEach((row, index) => {
+                let name = row.querySelector('.row-name').value.trim();
+                if (!name) {
+                    name = 'Articolo / Servizio #' + (index + 1);
+                }
+                const cost = parseFloat(row.querySelector('.row-cost').value) || 0;
+                const price = parseFloat(row.querySelector('.row-price').value) || 0;
+                const qty = parseInt(row.querySelector('.row-qty').value) || 1;
+
+                items.push({ name, cost, price, qty });
+                totalSale += price * qty;
+                totalCost += cost * qty;
+            });
+
+            const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+            const grossProfit = totalSale - totalCost;
+            const feeAmount = (paymentMethod === 'Carta') ? (totalSale * settings.cardFee) / 100 : 0;
+            const netProfit = grossProfit - feeAmount;
+
+            const now = new Date();
+            const entry = {
+                id: Date.now().toString(),
+                timestamp: now.toISOString(),
+                items,
+                paymentMethod,
+                totalSale,
+                totalCost,
+                feeAmount,
+                netProfit
+            };
+
+            entries.unshift(entry);
+            saveEntriesStorage();
+            lastCreatedEntry = entry;
+
+            generateWhatsAppOutput(entry);
+            populateThermalReceiptDOM(entry);
+            sendPDFToWhatsApp();
+
+            document.getElementById('productRows').innerHTML = '';
+            calculateSaleTotals();
+            renderReports();
+        }
+
+        function emitReceiptOnly() {
+            if (!lastCreatedEntry) {
+                if (entries.length > 0) lastCreatedEntry = entries[0];
+                else {
+                    showNotification('Attenzione', 'Nessun ordine presente per l\'emissione.', 'error');
+                    return;
+                }
+            }
+            closeThermalReceiptModal();
+            showNotification('Scontrino Emesso', 'Lo scontrino è stato registrato ed emesso correttamente con successo.');
+        }
+
+        function saveEntriesStorage() {
+            const keys = getStorageKeys();
+            localStorage.setItem(keys.entries, JSON.stringify(entries));
+        }
+
+        function loadEntries() {
+            const keys = getStorageKeys();
+            const saved = localStorage.getItem(keys.entries);
+            if (saved) {
+                try { entries = JSON.parse(saved); } catch(e) {}
+            } else {
+                entries = [];
+            }
+            if (entries.length > 0) {
+                lastCreatedEntry = entries[0];
+            }
+        }
+
+        function populateThermalReceiptDOM(entry) {
+            document.getElementById('thermalShopName').textContent = settings.shopName;
+            document.getElementById('thermalOwnerInfo').textContent = settings.ownerName + ' | P.IVA: ' + settings.vatNumber;
+            document.getElementById('thermalAddress').textContent = settings.address;
+            document.getElementById('thermalDate').textContent = new Date(entry.timestamp).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+            document.getElementById('thermalReceiptId').textContent = entry.id.slice(-6);
+            document.getElementById('thermalTotal').textContent = '€' + entry.totalSale.toFixed(2);
+            document.getElementById('thermalPaymentMethod').textContent = entry.paymentMethod;
+
+            const feeRow = document.getElementById('thermalFeeRow');
+            if (entry.paymentMethod === 'Carta' && entry.feeAmount > 0) {
+                feeRow.classList.remove('hidden');
+                document.getElementById('thermalFeeAmount').textContent = '-€' + entry.feeAmount.toFixed(2);
+            } else {
+                feeRow.classList.add('hidden');
+            }
+
+            let itemsHtml = '';
+            entry.items.forEach(item => {
+                const itemTotal = (item.price * item.qty).toFixed(2);
+                itemsHtml += `
+                    <div class="grid grid-cols-12 text-[10px]">
+                        <div class="col-span-6 truncate">${item.name}</div>
+                        <div class="col-span-2 text-center">${item.qty}</div>
+                        <div class="col-span-4 text-right font-semibold">€${itemTotal}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('thermalItemsList').innerHTML = itemsHtml;
+        }
+
+        function openThermalReceiptModal() {
+            if (!lastCreatedEntry) {
+                if (entries.length > 0) lastCreatedEntry = entries[0];
+                else {
+                    showNotification('Attenzione', 'Nessun scontrino recente disponibile.', 'error');
+                    return;
+                }
+            }
+            populateThermalReceiptDOM(lastCreatedEntry);
+            document.getElementById('thermalReceiptModal').classList.remove('hidden');
+        }
+
+        function closeThermalReceiptModal() {
+            document.getElementById('thermalReceiptModal').classList.add('hidden');
+        }
+
+        function printThermalReceipt() {
+            const printContent = document.getElementById('thermalReceiptBox').outerHTML;
+            const win = window.open('', '', 'height=600,width=400');
+            win.document.write('<html><head><title>Stampa Scontrino 90mm</title>');
+            win.document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+            win.document.write('<style>body { font-family: monospace; background: white; padding: 10px; }</style>');
+            win.document.write('</head><body>');
+            win.document.write(printContent);
+            win.document.write('</body></html>');
+            win.document.close();
+            win.focus();
+            setTimeout(() => {
+                win.print();
+                win.close();
+            }, 500);
+        }
+
+        function sendPDFToWhatsApp() {
+            if (!lastCreatedEntry) {
+                if (entries.length > 0) lastCreatedEntry = entries[0];
+                else return;
+            }
+            populateThermalReceiptDOM(lastCreatedEntry);
+            const element = document.getElementById('thermalReceiptBox');
+            const opt = {
+                margin:       5,
+                filename:     'Scontrino_' + lastCreatedEntry.id.slice(-6) + '.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 3, useCORS: true },
+                jsPDF:        { unit: 'mm', format: [90, 160], orientation: 'portrait' }
+            };
+
+            html2pdf().from(element).set(opt).outputPdf('blob').then((pdfBlob) => {
+                const pdfFile = new File([pdfBlob], 'Scontrino_' + lastCreatedEntry.id.slice(-6) + '.pdf', { type: 'application/pdf' });
+                
+                if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                    navigator.share({
+                        files: [pdfFile],
+                        title: 'Scontrino 90mm',
+                        text: currentWhatsAppText
+                    }).catch(() => {
+                        fallbackWhatsAppDownloadAndOpen(pdfBlob);
+                    });
+                } else {
+                    fallbackWhatsAppDownloadAndOpen(pdfBlob);
+                }
+            });
+        }
+
+        function fallbackWhatsAppDownloadAndOpen(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Scontrino_' + (lastCreatedEntry ? lastCreatedEntry.id.slice(-6) : '90mm') + '.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showNotification('PDF Pronto', 'PDF generato e scaricato. Ora puoi allegarlo nella chat WhatsApp.');
+            
+            setTimeout(() => {
+                const encoded = encodeURIComponent(currentWhatsAppText);
+                window.open('https://api.whatsapp.com/send?text=' + encoded, '_blank');
+            }, 1000);
+        }
+
+        function generateWhatsAppOutput(entry) {
+            const dateStr = new Date(entry.timestamp).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+            let itemsText = entry.items.map(i => '• ' + i.qty + 'x ' + i.name + ' - €' + (i.price * i.qty).toFixed(2)).join('\n');
+
+            let text = '🧾 *SCONTRINO 90mm* - *' + settings.shopName + '*\n';
+            text += '📅 Data: ' + dateStr + '\n';
+            text += '--------------------------------\n';
+            text += itemsText + '\n';
+            text += '--------------------------------\n';
+            text += '💰 *Totale Pagato: €' + entry.totalSale.toFixed(2) + '*\n';
+            text += '💳 Metodo: ' + entry.paymentMethod + '\n';
+            if (entry.paymentMethod === 'Carta' && entry.feeAmount > 0) {
+                text += '⚡ Trattenuta Carta: -€' + entry.feeAmount.toFixed(2) + '\n';
+            }
+            text += '✅ *Netto Ricavo: €' + entry.netProfit.toFixed(2) + '*\n\n';
+            text += 'Ecco in allegato il documento PDF dello scontrino.\n';
+            text += 'Grazie per aver scelto ' + settings.shopName + '! 🙏';
+
+            currentWhatsAppText = text;
+            document.getElementById('whatsappTextOutput').textContent = text;
+            document.getElementById('whatsappPreviewCard').classList.remove('hidden');
+        }
+
+        function copyReceiptText() {
+            const textarea = document.createElement('textarea');
+            textarea.value = currentWhatsAppText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showNotification('Copiato', 'Testo dello scontrino copiato negli appunti!');
+            } catch (err) {
+                showNotification('Errore', 'Impossibile copiare il testo.', 'error');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function setupDateInputs() {
+            const today = new Date().toISOString().split('T')[0];
+            const currentMonth = today.slice(0, 7);
+            const dateInput = document.getElementById('reportDateInput');
+            const monthInput = document.getElementById('reportMonthInput');
+            if (dateInput) dateInput.value = today;
+            if (monthInput) monthInput.value = currentMonth;
+        }
+
+        function toggleReportFilter() {
+            const filterType = document.getElementById('reportFilterType').value;
+            const dateInput = document.getElementById('reportDateInput');
+            const monthInput = document.getElementById('reportMonthInput');
+
+            if (filterType === 'daily') {
+                dateInput.classList.remove('hidden');
+                monthInput.classList.add('hidden');
+            } else if (filterType === 'monthly') {
+                dateInput.classList.add('hidden');
+                monthInput.classList.remove('hidden');
+            } else {
+                dateInput.classList.add('hidden');
+                monthInput.classList.add('hidden');
+            }
+            renderReports();
+        }
+
+        function getFilteredEntries() {
+            const filterType = document.getElementById('reportFilterType').value;
+            if (filterType === 'all') return entries;
+
+            if (filterType === 'daily') {
+                const selectedDate = document.getElementById('reportDateInput').value;
+                if (!selectedDate) return entries;
+                return entries.filter(e => e.timestamp.startsWith(selectedDate));
+            }
+
+            if (filterType === 'monthly') {
+                const selectedMonth = document.getElementById('reportMonthInput').value;
+                if (!selectedMonth) return entries;
+                return entries.filter(e => e.timestamp.startsWith(selectedMonth));
+            }
+            return entries;
+        }
+
+        function renderReports() {
+            const filtered = getFilteredEntries();
+            const tbody = document.getElementById('reportTableBody');
+            if (!tbody) return;
+
+            let totalSales = 0;
+            let totalCosts = 0;
+            let totalFees = 0;
+            let totalNet = 0;
+
+            tbody.innerHTML = '';
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400 text-xs">Nessuno scontrino trovato per il periodo selezionato.</td></tr>';
+            } else {
+                filtered.forEach(entry => {
+                    totalSales += entry.totalSale;
+                    totalCosts += entry.totalCost;
+                    totalFees += entry.feeAmount || 0;
+                    totalNet += entry.netProfit;
+
+                    const dateFormatted = new Date(entry.timestamp).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+                    const itemsSummary = entry.items.map(i => i.qty + 'x ' + i.name).join(', ');
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-3 text-xs text-slate-500">${dateFormatted}</td>
+                            <td class="py-3 px-3 text-xs text-slate-600 max-w-xs truncate" title="${itemsSummary}">${itemsSummary} <span class="text-[10px] text-slate-400 font-mono">(${entry.paymentMethod})</span></td>
+                            <td class="py-3 px-3 text-right font-semibold text-slate-900">€${entry.totalSale.toFixed(2)}</td>
+                            <td class="py-3 px-3 text-right font-semibold text-emerald-600">€${entry.netProfit.toFixed(2)}</td>
+                            <td class="py-3 px-3 text-center space-x-2">
+                                <button onclick="openEditModal('${entry.id}')" class="text-slate-400 hover:text-emerald-600 transition" title="Modifica"><i class="fa-solid fa-pen"></i></button>
+                                <button onclick="deleteEntry('${entry.id}')" class="text-slate-400 hover:text-rose-600 transition" title="Elimina"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            document.getElementById('repTotalSales').textContent = '€' + totalSales.toFixed(2);
+            document.getElementById('repTotalCosts').textContent = '€' + totalCosts.toFixed(2);
+            document.getElementById('repTotalFees').textContent = '-€' + totalFees.toFixed(2);
+            document.getElementById('repTotalNet').textContent = '€' + totalNet.toFixed(2);
+        }
+
+        function openEditModal(id) {
+            const entry = entries.find(e => e.id === id);
+            if (!entry) return;
+            document.getElementById('editEntryId').value = entry.id;
+            document.getElementById('editTotalAmount').value = entry.totalSale.toFixed(2);
+            document.getElementById('editNetProfitAmount').value = entry.netProfit.toFixed(2);
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function saveEditedEntry() {
+            const id = document.getElementById('editEntryId').value;
+            const totalSale = parseFloat(document.getElementById('editTotalAmount').value) || 0;
+            const netProfit = parseFloat(document.getElementById('editNetProfitAmount').value) || 0;
+
+            const entry = entries.find(e => e.id === id);
+            if (entry) {
+                entry.totalSale = totalSale;
+                entry.netProfit = netProfit;
+                saveEntriesStorage();
+                renderReports();
+                closeEditModal();
+                showNotification('Successo', 'Voce scontrino aggiornata!');
+            }
+        }
+
+        function deleteEntry(id) {
+            showConfirmModal('Vuoi davvero eliminare questo scontrino dal report?', () => {
+                entries = entries.filter(e => e.id !== id);
+                saveEntriesStorage();
+                renderReports();
+                showNotification('Eliminato', 'Scontrino rimosso con successo.');
+            });
+        }
+
+        function openReportViewModal() {
+            const filtered = getFilteredEntries();
+
+            let totalSales = 0, totalCosts = 0, totalFees = 0, totalNet = 0;
+            filtered.forEach(e => {
+                totalSales += e.totalSale;
+                totalCosts += e.totalCost;
+                totalFees += e.feeAmount || 0;
+                totalNet += e.netProfit;
+            });
+
+            const filterType = document.getElementById('reportFilterType').value;
+            let periodText = 'Tutti i Report';
+            if (filterType === 'daily') periodText = 'Giorno: ' + document.getElementById('reportDateInput').value;
+            if (filterType === 'monthly') periodText = 'Mese: ' + document.getElementById('reportMonthInput').value;
+
+            document.getElementById('modalReportPeriodLabel').textContent = 'Periodo: ' + periodText;
+            document.getElementById('modalReportCount').textContent = filtered.length + ' Scontrini';
+            document.getElementById('modalRepSales').textContent = '€' + totalSales.toFixed(2);
+            document.getElementById('modalRepCosts').textContent = '€' + totalCosts.toFixed(2);
+            document.getElementById('modalRepFees').textContent = '-€' + totalFees.toFixed(2);
+            document.getElementById('modalRepNet').textContent = '€' + totalNet.toFixed(2);
+
+            const listContainer = document.getElementById('modalReportEntriesList');
+            listContainer.innerHTML = '';
+            if (filtered.length === 0) {
+                listContainer.innerHTML = '<p class="text-center text-slate-400 text-xs py-4">Nessun scontrino in questo periodo.</p>';
+            } else {
+                filtered.forEach(entry => {
+                    const dt = new Date(entry.timestamp).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+                    const sum = entry.items.map(i => i.qty + 'x ' + i.name).join(', ');
+                    listContainer.innerHTML += `
+                        <div class="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+                            <div>
+                                <p class="font-bold text-slate-800">${dt} <span class="font-normal text-slate-500">(${entry.paymentMethod})</span></p>
+                                <p class="text-[11px] text-slate-600 truncate max-w-xs">${sum}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-slate-900">€${entry.totalSale.toFixed(2)}</p>
+                                <p class="text-[11px] font-semibold text-emerald-600">Netto: €${entry.netProfit.toFixed(2)}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('reportViewModal').classList.remove('hidden');
+        }
+
+        function closeReportViewModal() {
+            document.getElementById('reportViewModal').classList.add('hidden');
+        }
+
+        function exportReportPDFFromModal() {
+            closeReportViewModal();
+            exportReportPDF();
+        }
+
+        function exportReportPDF() {
+            const filtered = getFilteredEntries();
+            if (filtered.length === 0) {
+                showNotification('Attenzione', 'Nessun dato da esportare per il periodo selezionato.', 'error');
+                return;
+            }
+
+            document.getElementById('pdfShopName').textContent = settings.shopName;
+            document.getElementById('pdfOwnerInfo').textContent = settings.ownerName + ' | P.IVA: ' + settings.vatNumber + ' | ' + settings.address;
+            
+            const filterType = document.getElementById('reportFilterType').value;
+            let periodText = 'Tutti i periodi';
+            if (filterType === 'daily') periodText = 'Giorno: ' + document.getElementById('reportDateInput').value;
+            if (filterType === 'monthly') periodText = 'Mese: ' + document.getElementById('reportMonthInput').value;
+            document.getElementById('pdfReportPeriod').textContent = 'Periodo: ' + periodText;
+
+            let totalSales = 0;
+            let totalCosts = 0;
+            let totalFees = 0;
+            let totalNet = 0;
+            let pdfBody = '';
+
+            filtered.forEach(entry => {
+                totalSales += entry.totalSale;
+                totalCosts += entry.totalCost;
+                totalFees += entry.feeAmount || 0;
+                totalNet += entry.netProfit;
+
+                const dateFormatted = new Date(entry.timestamp).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+                const itemsSummary = entry.items.map(i => i.qty + 'x ' + i.name).join(', ');
+
+                pdfBody += `
+                    <tr>
+                        <td class="py-2 px-2 text-slate-600">${dateFormatted}</td>
+                        <td class="py-2 px-2 text-slate-600">${itemsSummary} (${entry.paymentMethod})</td>
+                        <td class="py-2 px-2 text-right font-semibold">€${entry.totalSale.toFixed(2)}</td>
+                        <td class="py-2 px-2 text-right font-semibold text-emerald-600">€${entry.netProfit.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('pdfTotalSales').textContent = '€' + totalSales.toFixed(2);
+            document.getElementById('pdfTotalCosts').textContent = '€' + totalCosts.toFixed(2);
+            document.getElementById('pdfTotalFees').textContent = '-€' + totalFees.toFixed(2);
+            document.getElementById('pdfTotalNet').textContent = '€' + totalNet.toFixed(2);
+            document.getElementById('pdfTableBody').innerHTML = pdfBody;
+
+            const element = document.getElementById('pdfExportContainer');
+            element.classList.remove('hidden');
+
+            const opt = {
+                margin:       10,
+                filename:     'Report_Vendite_' + settings.shopName.replace(/\s+/g, '_') + '.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(element).set(opt).save().then(() => {
+                element.classList.add('hidden');
+                showNotification('Successo', 'Report PDF generato con successo!');
+            }).catch(err => {
+                element.classList.add('hidden');
+                showNotification('Errore', 'Impossibile generare il PDF.', 'error');
+            });
+        }
+
+        function exportProjectFile() {
+            const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'gestione_scontrini_' + settings.shopName.toLowerCase().replace(/\s+/g, '_') + '.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showNotification('Successo', 'Backup completo del progetto esportato in un file HTML!');
+        }
+    </script>
+</body>
+</html>
